@@ -725,6 +725,39 @@ function SearchPage() {
   const searchWrapRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
+  const fetchTracked = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/api/products/tracked`);
+      setTrackedUrls(
+        new Set((res.data.products || []).map((p: any) => p.product_url))
+      );
+    } catch (e) {
+      console.error('Failed to fetch tracked products', e);
+    }
+  };
+
+  const fetchCatalog = async (targetPage = page, q = query) => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({
+        page: String(targetPage),
+        pageSize: '20'
+      });
+      if (q && q.trim()) {
+        params.append('q', q.trim());
+      }
+      const res = await axios.get(`${API_URL}/api/products/search?${params.toString()}`);
+      setResults(res.data.results || []);
+      if (res.data.page) setPage(res.data.page);
+      if (res.data.pages) setTotalPages(res.data.pages);
+      if (res.data.total !== undefined) setTotalProducts(res.data.total);
+    } catch (e) {
+      console.error('Failed to fetch catalog search', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchCatalog(1, '');
     fetchTracked();
@@ -759,37 +792,6 @@ function SearchPage() {
 
     return () => clearTimeout(timer);
   }, [query]);
-
-  const fetchTracked = async () => {
-    try {
-      const res = await axios.get(`${API_URL}/api/products/tracked`);
-      setTrackedUrls(
-        new Set((res.data.products || []).map((p: any) => p.product_url))
-      );
-    } catch (e) {}
-  };
-
-  const fetchCatalog = async (targetPage = page, q = query) => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({
-        page: String(targetPage),
-        pageSize: '20'
-      });
-      if (q && q.trim()) {
-        params.append('q', q.trim());
-      }
-      const res = await axios.get(`${API_URL}/api/products/search?${params.toString()}`);
-      setResults(res.data.results || []);
-      if (res.data.page) setPage(res.data.page);
-      if (res.data.pages) setTotalPages(res.data.pages);
-      if (res.data.total !== undefined) setTotalProducts(res.data.total);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleSearch = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
