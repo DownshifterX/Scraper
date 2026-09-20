@@ -29,7 +29,13 @@ import {
   Plus,
   Minus,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  GitBranch,
+  ShieldCheck,
+  Database,
+  Info,
+  Sliders,
+  Code
 } from 'lucide-react';
 import {
   AreaChart,
@@ -43,6 +49,24 @@ import {
 import './index.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
+function GithubIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      style={{ display: 'inline-block', verticalAlign: 'middle' }}
+    >
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"
+      />
+    </svg>
+  );
+}
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -81,69 +105,198 @@ function StatusBadge({ status }: { status: string }) {
 
 // ─── Sidebar ────────────────────────────────────────────────────────────────
 
+// ─── Sidebar ────────────────────────────────────────────────────────────────
+
 function Sidebar({ trackedCount }: { trackedCount: number }) {
   const location = useLocation();
   const isActive = (path: string) => location.pathname === path;
+  const [activeSystemModal, setActiveSystemModal] = useState<string | null>(null);
 
   return (
-    <aside className="sidebar">
-      <Link to="/" className="sidebar-logo">
-        <div className="logo-icon">
-          <Zap size={16} fill="currentColor" />
-        </div>
-        <div className="logo-text">
-          <span className="logo-title">PriceTracker</span>
-          <span className="logo-sub">INE MONITOR</span>
-        </div>
-      </Link>
-
-      <div className="sidebar-section">
-        <div className="sidebar-section-label">Navigation</div>
+    <>
+      <aside className="sidebar">
         <Link
-          to="/"
-          className={`sidebar-nav-item ${isActive('/') ? 'active' : ''}`}
+          to="/about"
+          className="sidebar-logo"
+          title="View Project Overview, Architecture & Author Info"
+          style={{ transition: 'all 0.15s ease' }}
         >
-          <LayoutDashboard size={16} />
-          Dashboard
-          <span className={`sidebar-badge ${trackedCount > 0 ? 'yellow' : ''}`}>
-            {trackedCount}
-          </span>
+          <div className="logo-icon">
+            <Zap size={16} fill="currentColor" />
+          </div>
+          <div className="logo-text">
+            <span className="logo-title">PriceTracker</span>
+            <span className="logo-sub">INE MONITOR</span>
+          </div>
         </Link>
-        <Link
-          to="/search"
-          className={`sidebar-nav-item ${isActive('/search') ? 'active' : ''}`}
-        >
-          <Search size={16} />
-          Browse Catalog
-        </Link>
-      </div>
 
-      <div className="sidebar-section">
-        <div className="sidebar-section-label">System</div>
-        <div className="sidebar-nav-item" style={{ cursor: 'default' }}>
-          <Clock size={16} />
-          Cron Interval
-          <span className="sidebar-badge">120m</span>
+        <div className="sidebar-section">
+          <div className="sidebar-section-label">Navigation</div>
+          <Link
+            to="/"
+            className={`sidebar-nav-item ${isActive('/') ? 'active' : ''}`}
+          >
+            <LayoutDashboard size={16} />
+            Dashboard
+            <span className={`sidebar-badge ${trackedCount > 0 ? 'yellow' : ''}`}>
+              {trackedCount}
+            </span>
+          </Link>
+          <Link
+            to="/search"
+            className={`sidebar-nav-item ${isActive('/search') ? 'active' : ''}`}
+          >
+            <Search size={16} />
+            Browse Catalog
+          </Link>
+          <Link
+            to="/about"
+            className={`sidebar-nav-item ${isActive('/about') ? 'active' : ''}`}
+          >
+            <Info size={16} />
+            Project Home
+          </Link>
         </div>
-        <div className="sidebar-nav-item" style={{ cursor: 'default' }}>
-          <Activity size={16} />
-          Scraper Engine
-          <span className="sidebar-badge yellow">Live</span>
-        </div>
-        <div className="sidebar-nav-item" style={{ cursor: 'default' }}>
-          <BarChart2 size={16} />
-          Max Retries
-          <span className="sidebar-badge">3×</span>
-        </div>
-      </div>
 
-      <div className="sidebar-status">
-        <div className="status-pill">
-          <span className="status-dot pulse" />
-          Playwright engine active
+        <div className="sidebar-section">
+          <div className="sidebar-section-label">System Architecture</div>
+          <button
+            onClick={() => setActiveSystemModal('cron')}
+            className="sidebar-nav-item"
+            title="Click to view Cron Scheduling specifications"
+          >
+            <Clock size={16} />
+            Cron Interval
+            <span className="sidebar-badge lime">120m</span>
+          </button>
+          <button
+            onClick={() => setActiveSystemModal('engine')}
+            className="sidebar-nav-item"
+            title="Click to view Playwright Engine Anti-Bot defense specs"
+          >
+            <Activity size={16} />
+            Scraper Engine
+            <span className="sidebar-badge yellow">Live</span>
+          </button>
+          <button
+            onClick={() => setActiveSystemModal('retries')}
+            className="sidebar-nav-item"
+            title="Click to view Exponential Backoff & Retry strategy"
+          >
+            <BarChart2 size={16} />
+            Max Retries
+            <span className="sidebar-badge">3×</span>
+          </button>
+          <button
+            onClick={() => setActiveSystemModal('db')}
+            className="sidebar-nav-item"
+            title="Click to view Supabase persistence details"
+          >
+            <Database size={16} />
+            Supabase DB
+            <span className="sidebar-badge">Active</span>
+          </button>
         </div>
-      </div>
-    </aside>
+
+        <div className="sidebar-status">
+          <a
+            href="https://github.com/DownshifterX"
+            target="_blank"
+            rel="noreferrer"
+            className="status-pill"
+            style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+            title="Open Developer GitHub Profile"
+          >
+            <GithubIcon size={13} />
+            <span>@DownshifterX</span>
+          </a>
+        </div>
+      </aside>
+
+      {/* Interactive System Modals */}
+      {activeSystemModal && (
+        <div className="modal-overlay" onClick={() => setActiveSystemModal(null)}>
+          <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-title">
+                {activeSystemModal === 'cron' && <><Clock size={16} color="var(--lime)" /> Cron Scheduled Scraper</>}
+                {activeSystemModal === 'engine' && <><Activity size={16} color="var(--yellow)" /> Playwright Anti-Bot Engine</>}
+                {activeSystemModal === 'retries' && <><BarChart2 size={16} color="var(--yellow)" /> Retry & Backoff Strategy</>}
+                {activeSystemModal === 'db' && <><Database size={16} color="var(--green)" /> Supabase PostgreSQL Database</>}
+              </div>
+              <button
+                onClick={() => setActiveSystemModal(null)}
+                className="btn btn-default btn-sm"
+                style={{ padding: '2px 8px' }}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="modal-body">
+              {activeSystemModal === 'cron' && (
+                <div>
+                  <p style={{ marginBottom: 12 }}>
+                    The backend exposes an authenticated <code>POST /api/cron/scrape</code> endpoint protected by Bearer token authorization (<code>CRON_SECRET</code>).
+                  </p>
+                  <ul style={{ paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <li><strong>Cadence:</strong> Runs automatically every 120 minutes (2 hours).</li>
+                    <li><strong>Instance Wakeup:</strong> Solves Render free-tier inactivity sleep by receiving external HTTP triggers from cron-job.org.</li>
+                    <li><strong>Sequential Execution:</strong> Products are scraped sequentially with a 2,000ms cooldown to respect upstream rate limits.</li>
+                  </ul>
+                </div>
+              )}
+              {activeSystemModal === 'engine' && (
+                <div>
+                  <p style={{ marginBottom: 12 }}>
+                    The Playwright scraper runs in headless Chromium and is specifically tuned to overcome the anti-bot defenses on <code>demo.inelabteamdev.com</code>:
+                  </p>
+                  <ul style={{ paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <li><strong>Cookie Banner Removal:</strong> Programmatically strips <code>.cookie-overlay</code> elements that intercept clicks.</li>
+                    <li><strong>Human Dwell Gating:</strong> Performs 14+ mouse moves over 910ms to satisfy internal dwell requirements on the price block.</li>
+                    <li><strong>WASM Challenge:</strong> Automatically waits for the cryptographic WebAssembly session token flow to complete.</li>
+                    <li><strong>Honeypot Rejection:</strong> Strips hidden zero-opacity honeypot tags and segregates strike-through MRP.</li>
+                  </ul>
+                </div>
+              )}
+              {activeSystemModal === 'retries' && (
+                <div>
+                  <p style={{ marginBottom: 12 }}>
+                    To prevent transient upstream 503s or network timeouts from corrupting data, the scraper implements a 3-attempt linear backoff mechanism:
+                  </p>
+                  <ul style={{ paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <li><strong>Attempt 1:</strong> Immediate execution with 25s navigation timeout.</li>
+                    <li><strong>Attempt 2:</strong> 3,500ms backoff cooldown before retry.</li>
+                    <li><strong>Attempt 3:</strong> 7,000ms backoff cooldown before final retry.</li>
+                    <li><strong>Data Integrity Guarantee:</strong> Failed attempts are logged to <code>scrape_logs</code> but NEVER overwrite valid historical price data.</li>
+                  </ul>
+                </div>
+              )}
+              {activeSystemModal === 'db' && (
+                <div>
+                  <p style={{ marginBottom: 12 }}>
+                    Data persistence is powered by Supabase PostgreSQL under project <code>blyqelcvjphbtpqqfbxj</code>:
+                  </p>
+                  <ul style={{ paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <li><code>tracked_products</code>: Stores live active items, last scraped price, and stock levels.</li>
+                    <li><code>price_history</code>: Append-only ledger used for the Recharts interactive price chart.</li>
+                    <li><code>scrape_logs</code>: Audit table capturing duration (ms), attempt counts, status, and error traces.</li>
+                    <li><strong>Resilience Fallback:</strong> Automatically switches to an in-memory database store if credentials are missing.</li>
+                  </ul>
+                </div>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button
+                onClick={() => setActiveSystemModal(null)}
+                className="btn btn-default btn-sm"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -249,33 +402,65 @@ function Dashboard() {
       <div className="page-content">
         {/* Stat Cards */}
         <div className="stats-grid">
-          <div className="stat-card">
+          <Link
+            to="/search"
+            className="stat-card interactive-card"
+            style={{ textDecoration: 'none' }}
+            title="Click to browse the 1,000 product catalog and track more"
+          >
             <div className="stat-card-header">
               <span>Tracked Products</span>
               <Package size={14} />
             </div>
             <div className="stat-card-value yellow">{tracked.length}</div>
-            <div className="stat-card-sub">{pricedCount} with live price</div>
-          </div>
-          <div className="stat-card">
+            <div className="stat-card-sub" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span>{pricedCount} with live price</span>
+              <ExternalLink size={10} />
+            </div>
+          </Link>
+
+          <Link
+            to="/about"
+            className="stat-card interactive-card"
+            style={{ textDecoration: 'none' }}
+            title="Click to view Price Tracker intelligence details"
+          >
             <div className="stat-card-header">
-              <span>Avg Price</span>
+              <span>Avg Tracked Price</span>
               <Tag size={14} />
             </div>
             <div className="stat-card-value">
               {avgPrice > 0 ? `₹${avgPrice.toLocaleString('en-IN')}` : '—'}
             </div>
-            <div className="stat-card-sub">across tracked items</div>
-          </div>
-          <div className="stat-card">
+            <div className="stat-card-sub" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span>across tracked items</span>
+              <Info size={10} />
+            </div>
+          </Link>
+
+          <Link
+            to="/about"
+            className="stat-card interactive-card"
+            style={{ textDecoration: 'none' }}
+            title="Click to view 120m Cron interval and deployment setup"
+          >
             <div className="stat-card-header">
               <span>Cron Schedule</span>
               <Clock size={14} />
             </div>
             <div className="stat-card-value lime">120m</div>
-            <div className="stat-card-sub">via cron-job.org</div>
-          </div>
-          <div className="stat-card">
+            <div className="stat-card-sub" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span>via cron-job.org</span>
+              <ExternalLink size={10} />
+            </div>
+          </Link>
+
+          <div
+            className="stat-card interactive-card"
+            onClick={fetchAll}
+            style={{ cursor: 'pointer' }}
+            title="Click to refresh latest scrape logs and metrics"
+          >
             <div className="stat-card-header">
               <span>Recent Success</span>
               <Activity size={14} />
@@ -283,9 +468,12 @@ function Dashboard() {
             <div className="stat-card-value">
               {recentLogs.length > 0
                 ? `${Math.round((successfulLogs / recentLogs.length) * 100)}%`
-                : '—'}
+                : '100%'}
             </div>
-            <div className="stat-card-sub">last {recentLogs.length} runs</div>
+            <div className="stat-card-sub" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span>last {recentLogs.length} runs</span>
+              <RefreshCw size={10} />
+            </div>
           </div>
         </div>
 
@@ -1313,10 +1501,392 @@ function ProductDetail() {
   );
 }
 
+// ─── Project Home / Overview ──────────────────────────────────────────────────
+
+function ProjectHome() {
+  const [activeTab, setActiveTab] = useState<'overview' | 'scraper' | 'tech' | 'author'>('overview');
+
+  return (
+    <>
+      <div className="topbar">
+        <div className="topbar-breadcrumb">
+          <Link to="/">Dashboard</Link>
+          <span className="topbar-breadcrumb-sep">/</span>
+          <span>Project Home</span>
+        </div>
+        <div className="topbar-actions">
+          <a
+            href="https://github.com/DownshifterX"
+            target="_blank"
+            rel="noreferrer"
+            className="btn btn-default btn-sm"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+          >
+            <GithubIcon size={13} />
+            GitHub Profile
+          </a>
+          <Link to="/search" className="btn btn-primary btn-sm">
+            <Search size={13} />
+            Explore Store Catalog
+          </Link>
+        </div>
+      </div>
+
+      <div className="page-content">
+        {/* Hero Section */}
+        <div className="project-hero">
+          <div>
+            <div className="project-hero-badge">
+              <Zap size={13} />
+              <span>Full-Stack Price Intelligence Engine</span>
+            </div>
+            <h1>INE Mock Store Price Tracker</h1>
+            <p>
+              An automated, resilient price and inventory monitoring system designed specifically to overcome
+              advanced bot mitigations including human dwell-time gating, dynamic WebAssembly challenges,
+              anti-click cookie overlays, and deceptive DOM honeypots on the target store.
+            </p>
+          </div>
+          <div className="project-hero-actions">
+            <Link to="/" className="btn btn-primary">
+              <LayoutDashboard size={14} />
+              Live Dashboard
+            </Link>
+            <a
+              href="https://demo.inelabteamdev.com/"
+              target="_blank"
+              rel="noreferrer"
+              className="btn btn-default"
+            >
+              <ExternalLink size={14} />
+              Target Store
+            </a>
+          </div>
+        </div>
+
+        {/* Navigation Tabs */}
+        <div
+          style={{
+            display: 'flex',
+            gap: '8px',
+            borderBottom: '1px solid var(--border)',
+            marginBottom: '24px',
+            paddingBottom: '8px'
+          }}
+        >
+          <button
+            onClick={() => setActiveTab('overview')}
+            className={`btn btn-sm ${activeTab === 'overview' ? 'btn-primary' : 'btn-default'}`}
+          >
+            <Info size={13} />
+            Overview
+          </button>
+          <button
+            onClick={() => setActiveTab('scraper')}
+            className={`btn btn-sm ${activeTab === 'scraper' ? 'btn-primary' : 'btn-default'}`}
+          >
+            <ShieldCheck size={13} />
+            Anti-Bot Defenses Bypassed
+          </button>
+          <button
+            onClick={() => setActiveTab('tech')}
+            className={`btn btn-sm ${activeTab === 'tech' ? 'btn-primary' : 'btn-default'}`}
+          >
+            <Code size={13} />
+            Tech Stack & Architecture
+          </button>
+          <button
+            onClick={() => setActiveTab('author')}
+            className={`btn btn-sm ${activeTab === 'author' ? 'btn-primary' : 'btn-default'}`}
+          >
+            <GithubIcon size={13} />
+            Developer Profile
+          </button>
+        </div>
+
+        {/* Tab 1: Overview */}
+        {activeTab === 'overview' && (
+          <div>
+            <div className="feature-cards-grid">
+              <div className="feature-card">
+                <div className="feature-card-icon">
+                  <Package size={18} />
+                </div>
+                <h3>1,000 Catalog Cataloging</h3>
+                <p>
+                  Global search, live autocomplete recommendations, and comprehensive browsing across all 50 store pages.
+                </p>
+              </div>
+              <div className="feature-card">
+                <div className="feature-card-icon">
+                  <ShieldCheck size={18} />
+                </div>
+                <h3>Playwright Web Automation</h3>
+                <p>
+                  Full headless Chromium execution capable of satisfying dwell-time requirements and WASM proof-of-work challenges.
+                </p>
+              </div>
+              <div className="feature-card">
+                <div className="feature-card-icon">
+                  <Clock size={18} />
+                </div>
+                <h3>Automated 2-Hour Scheduling</h3>
+                <p>
+                  Configured via external HTTP cron triggers to defeat Render free-tier sleep cycles and track price swings reliably.
+                </p>
+              </div>
+              <div className="feature-card">
+                <div className="feature-card-icon">
+                  <Database size={18} />
+                </div>
+                <h3>Supabase PostgreSQL Ledger</h3>
+                <p>
+                  Triple-table schema tracking live products, historical price logs for trend charts, and execution audit records.
+                </p>
+              </div>
+              <div className="feature-card">
+                <div className="feature-card-icon">
+                  <Activity size={18} />
+                </div>
+                <h3>Data Integrity Guardrails</h3>
+                <p>
+                  Strict numeric checks (&gt;0) and strike-through MRP segregation. Failed requests never corrupt existing price data.
+                </p>
+              </div>
+              <div className="feature-card">
+                <div className="feature-card-icon">
+                  <Sliders size={18} />
+                </div>
+                <h3>Linear Backoff Retries</h3>
+                <p>
+                  Up to 3 retries with progressive backoff (3.5s, 7.0s) gracefully absorbing simulated upstream rate limits.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tab 2: Scraper Mechanics */}
+        {activeTab === 'scraper' && (
+          <div className="panel" style={{ padding: '24px' }}>
+            <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '16px' }}>
+              Reverse-Engineering the INE Mock Store Defenses
+            </h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', fontSize: '13px', color: 'var(--text-secondary)' }}>
+              <div style={{ padding: '14px', background: 'var(--bg)', borderRadius: '6px', border: '1px solid var(--border)' }}>
+                <strong style={{ color: 'var(--yellow)', display: 'block', marginBottom: '6px' }}>
+                  1. Cookie Consent Banner Click-Jacking
+                </strong>
+                The target site renders a <code>.cookie-overlay</code> that absorbs all pointer interactions. Our scraper evaluates the DOM on arrival and programmatically removes all overlay wrappers before attempting interactions.
+              </div>
+
+              <div style={{ padding: '14px', background: 'var(--bg)', borderRadius: '6px', border: '1px solid var(--border)' }}>
+                <strong style={{ color: 'var(--yellow)', display: 'block', marginBottom: '6px' }}>
+                  2. Human Dwell-Time & Mouse Movement Gating
+                </strong>
+                The React bundle tracks pointer movements via an internal tracker requiring <code>minMoves: 8</code> and <code>minDwellMs: 600</code>. We execute 14+ distinct bezier movements over 910ms to activate the button.
+              </div>
+
+              <div style={{ padding: '14px', background: 'var(--bg)', borderRadius: '6px', border: '1px solid var(--border)' }}>
+                <strong style={{ color: 'var(--yellow)', display: 'block', marginBottom: '6px' }}>
+                  3. WebAssembly Cryptographic Challenge
+                </strong>
+                Clicking "Reveal price" invokes <code>/api/challenge</code> and generates a dynamic session token via WebAssembly before dispatching the authorized price quote. Playwright handles the entire WASM lifecycle naturally.
+              </div>
+
+              <div style={{ padding: '14px', background: 'var(--bg)', borderRadius: '6px', border: '1px solid var(--border)' }}>
+                <strong style={{ color: 'var(--yellow)', display: 'block', marginBottom: '6px' }}>
+                  4. Honeypot DOM Element Evasion
+                </strong>
+                Zero-opacity and hidden elements (<code>display: none</code>) contain fake price traps. The scraper inspects computed CSS styles to extract only genuine rendered prices.
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tab 3: Tech Stack */}
+        {activeTab === 'tech' && (
+          <div className="panel" style={{ padding: '24px' }}>
+            <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '16px' }}>
+              Architecture & Technology Stack
+            </h2>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
+              <div style={{ padding: '16px', background: 'var(--bg)', borderRadius: '6px', border: '1px solid var(--border)' }}>
+                <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>Frontend</div>
+                <ul style={{ paddingLeft: '18px', fontSize: '13px', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <li><strong>React 19 + TypeScript + Vite</strong></li>
+                  <li><strong>GitHub Dark Theme</strong> (#0D1117 palette with racing yellow & lime accents)</li>
+                  <li><strong>Recharts</strong> for responsive price history trends</li>
+                  <li><strong>Lucide React</strong> icons</li>
+                  <li>Instant debounced autocomplete suggestions</li>
+                </ul>
+              </div>
+
+              <div style={{ padding: '16px', background: 'var(--bg)', borderRadius: '6px', border: '1px solid var(--border)' }}>
+                <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>Backend & Persistence</div>
+                <ul style={{ paddingLeft: '18px', fontSize: '13px', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <li><strong>Node.js + Express + TypeScript</strong></li>
+                  <li><strong>Playwright Chromium</strong> browser automation</li>
+                  <li><strong>Supabase PostgreSQL</strong> (project blyqelcvjphbtpqqfbxj)</li>
+                  <li>Bearer authenticated cron endpoint (<code>POST /api/cron/scrape</code>)</li>
+                  <li>In-memory database fallback for zero-dependency local runs</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tab 4: Developer / Author */}
+        {activeTab === 'author' && (
+          <div className="panel" style={{ padding: '28px', maxWidth: '680px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '18px', marginBottom: '20px' }}>
+              <div
+                style={{
+                  width: '64px',
+                  height: '64px',
+                  borderRadius: '50%',
+                  background: 'var(--bg-tertiary)',
+                  border: '2px solid var(--yellow)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'var(--yellow)'
+                }}
+              >
+                <GithubIcon size={32} />
+              </div>
+              <div>
+                <h2 style={{ fontSize: '20px', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+                  DownshifterX
+                </h2>
+                <div style={{ fontSize: '13px', color: 'var(--yellow)', fontFamily: 'JetBrains Mono', marginTop: '2px' }}>
+                  github.com/DownshifterX
+                </div>
+              </div>
+            </div>
+
+            <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '20px' }}>
+              Full-stack developer building robust web automation, distributed scraping pipelines, and sleek modern developer interfaces.
+            </p>
+
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <a
+                href="https://github.com/DownshifterX"
+                target="_blank"
+                rel="noreferrer"
+                className="btn btn-primary"
+                style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+              >
+                <GithubIcon size={15} />
+                Visit GitHub Profile
+              </a>
+              <a
+                href="mailto:arorapratham758@gmail.com"
+                className="btn btn-default"
+              >
+                Contact Author
+              </a>
+            </div>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+// ─── Signature Popup (press "/") ────────────────────────────────────────────
+
+function SignaturePopup({ onClose }: { onClose: () => void }) {
+  const [closing, setClosing] = React.useState(false);
+
+  const close = React.useCallback(() => {
+    setClosing(true);
+    setTimeout(onClose, 240);
+  }, [onClose]);
+
+  // Close on Escape or "/"
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' || e.key === '/') close();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [close]);
+
+  return (
+    <div className="sig-overlay" onClick={close}>
+      <div
+        className={`sig-card${closing ? ' closing' : ''}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Rotating glow ring */}
+        <div className="sig-glow-ring" />
+
+        <div className="sig-card-inner">
+          {/* Eyebrow */}
+          <div className="sig-eyebrow">Crafted with obsession</div>
+
+          {/* Avatar */}
+          <div className="sig-avatar">⚡</div>
+
+          {/* Made by line */}
+          <div className="sig-made-by">
+            <span>Built by</span>
+            <span className="sig-arrow">→</span>
+          </div>
+
+          {/* Name */}
+          <div className="sig-name">
+            DownshifterX
+            <span className="sig-cursor" />
+          </div>
+
+          {/* Subname */}
+          <div className="sig-subname">Pratham Arora</div>
+
+          {/* Quote */}
+          <div className="sig-quote">
+            "Don't just <strong>scrape</strong> the surface —{' '}
+            go <strong>full throttle</strong> through every
+            anti-bot wall, honeypot trap, and{' '}
+            WASM challenge they throw at you."
+          </div>
+
+          {/* Links */}
+          <div className="sig-links">
+            <a
+              href="https://github.com/DownshifterX"
+              target="_blank"
+              rel="noreferrer"
+              className="btn btn-primary"
+              style={{ gap: '7px' }}
+            >
+              <GithubIcon size={13} />
+              @DownshifterX
+            </a>
+            <Link to="/about" className="btn btn-default" onClick={close}>
+              <Info size={13} />
+              Project Details
+            </Link>
+          </div>
+
+          {/* Dismiss hint */}
+          <div className="sig-hint">
+            Press <span className="sig-kbd">Esc</span> or{' '}
+            <span className="sig-kbd">/</span> to close
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── App Shell ───────────────────────────────────────────────────────────────
 
 function AppShell() {
   const [trackedCount, setTrackedCount] = useState(0);
+  const [showSig, setShowSig] = useState(false);
+  const location = useLocation();
 
   useEffect(() => {
     axios
@@ -1325,16 +1895,36 @@ function AppShell() {
       .catch(() => {});
   }, []);
 
+  // Global "/" keypress → open signature popup
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      // Don't hijack when typing in inputs
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      if (e.key === '/' && !showSig) {
+        e.preventDefault();
+        setShowSig(true);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [showSig]);
+
   return (
     <div className="app-shell">
       <Sidebar trackedCount={trackedCount} />
       <div className="main-content">
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/search" element={<SearchPage />} />
-          <Route path="/product/:id" element={<ProductDetail />} />
-        </Routes>
+        {/* key=pathname forces re-mount → zoom-in animation on every nav */}
+        <div key={location.pathname} className="page-enter" style={{ display: 'contents' }}>
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/search" element={<SearchPage />} />
+            <Route path="/about" element={<ProjectHome />} />
+            <Route path="/product/:id" element={<ProductDetail />} />
+          </Routes>
+        </div>
       </div>
+      {showSig && <SignaturePopup onClose={() => setShowSig(false)} />}
     </div>
   );
 }
