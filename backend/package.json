@@ -8,8 +8,9 @@
     "dev": "tsx watch src/index.ts",
     "scrape:headed": "tsx src/headed-demo.ts",
     "scrape:headless": "tsx src/headed-demo.ts --headless",
-    "build": "npx playwright install chromium && tsc -p tsconfig.build.json",
-    "start": "node dist/index.js"
+    "build": "npx playwright install --with-deps chromium && tsc -p tsconfig.build.json",
+    "postinstall": "npx playwright install chromium || true",
+    "start": "npx playwright install chromium && node dist/index.js"
   },
   "keywords": [],
   "author": "",
