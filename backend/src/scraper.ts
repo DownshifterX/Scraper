@@ -284,15 +284,137 @@ export interface CatalogResponse {
   total: number;
 }
 
-const catalogPageCache = new Map<number, { data: CatalogResponse; timestamp: number }>();
+let fullCatalogCache: CatalogItem[] = [];
+let fullCatalogCacheTime = 0;
+let isFetchingFullCatalog = false;
 
-export async function fetchStoreProducts(page = 1, pageSize = 20): Promise<CatalogResponse> {
-  const cached = catalogPageCache.get(page);
+/**
+ * Fetch and cache all 1,000 products across all pages from the INE store.
+ */
+export async function getFullCatalog(): Promise<CatalogItem[]> {
   const now = Date.now();
-  if (cached && now - cached.timestamp < 5 * 60 * 1000) {
-    return cached.data;
+  if (fullCatalogCache.length >= 1000 && now - fullCatalogCacheTime < 15 * 60 * 1000) {
+    return fullCatalogCache;
   }
 
+  if (isFetchingFullCatalog && fullCatalogCache.length > 0) {
+    return fullCatalogCache;
+  }
+
+  isFetchingFullCatalog = true;
+  try {
+    const allItems: CatalogItem[] = [];
+    // The endpoint supports pageSize=60 -> 17 pages covers all 1000 items
+    for (let p = 1; p <= 17; p++) {
+      let success = false;
+      for (let retry = 0; retry < 3; retry++) {
+        try {
+          const res = await fetch(`https://demo.inelabteamdev.com/api/catalog?page=${p}&pageSize=60`, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            }
+          });
+          if (res.status === 429) {
+            await new Promise((r) => setTimeout(r, 1100));
+            continue;
+          }
+          if (res.ok) {
+            const data: any = await res.json();
+            const items = (data.items || []).map((item: any) => ({
+              id: item.id,
+              name: item.name,
+              url: `https://demo.inelabteamdev.com/product/${item.id}`,
+              sku: item.sku,
+              category: item.category,
+              brand: item.brand
+            }));
+            allItems.push(...items);
+            success = true;
+            break;
+          }
+        } catch {
+          await new Promise((r) => setTimeout(r, 500));
+        }
+      }
+      if (!success) {
+        console.warn(`[Catalog] Failed to load catalog page ${p}`);
+      }
+    }
+
+    if (allItems.length > 0) {
+      // Deduplicate by ID
+      const seen = new Set<number>();
+      const deduped: CatalogItem[] = [];
+      for (const item of allItems) {
+        if (!seen.has(item.id)) {
+          seen.add(item.id);
+          deduped.push(item);
+        }
+      }
+      fullCatalogCache = deduped;
+      fullCatalogCacheTime = now;
+      console.log(`[Catalog] Cached ${fullCatalogCache.length} products globally from INE store.`);
+    }
+  } catch (err: any) {
+    console.error('[Catalog] Error building full catalog cache:', err.message);
+  } finally {
+    isFetchingFullCatalog = false;
+  }
+
+  return fullCatalogCache;
+}
+
+// Prefetch catalog in background on module load
+getFullCatalog().catch(() => {});
+
+export async function searchAllProducts(
+  query: string,
+  page = 1,
+  pageSize = 20
+): Promise<{ results: CatalogItem[]; total: number; page: number; pages: number }> {
+  const catalog = await getFullCatalog();
+  const q = query.trim().toLowerCase();
+
+  const filtered = !q
+    ? catalog
+    : catalog.filter((item) =>
+        item.name.toLowerCase().includes(q) ||
+        (item.category && item.category.toLowerCase().includes(q)) ||
+        (item.brand && item.brand.toLowerCase().includes(q)) ||
+        (item.sku && item.sku.toLowerCase().includes(q))
+      );
+
+  const total = filtered.length;
+  const pages = Math.max(1, Math.ceil(total / pageSize));
+  const validPage = Math.min(Math.max(1, page), pages);
+  const start = (validPage - 1) * pageSize;
+  const results = filtered.slice(start, start + pageSize);
+
+  return {
+    results,
+    total,
+    page: validPage,
+    pages
+  };
+}
+
+export async function fetchStoreProducts(page = 1, pageSize = 20): Promise<CatalogResponse> {
+  const catalog = await getFullCatalog();
+  if (catalog.length > 0) {
+    const total = catalog.length;
+    const pages = Math.ceil(total / pageSize);
+    const validPage = Math.min(Math.max(1, page), pages);
+    const start = (validPage - 1) * pageSize;
+    return {
+      items: catalog.slice(start, start + pageSize),
+      page: validPage,
+      pageSize,
+      pages,
+      total
+    };
+  }
+
+  // Fallback to direct page fetch if full catalog isn't ready
   try {
     const res = await fetch(`https://demo.inelabteamdev.com/api/catalog?page=${page}&pageSize=${pageSize}`, {
       headers: {
@@ -311,16 +433,13 @@ export async function fetchStoreProducts(page = 1, pageSize = 20): Promise<Catal
         brand: item.brand
       }));
 
-      const result: CatalogResponse = {
+      return {
         items,
         page: Number(data.page) || page,
         pageSize: Number(data.pageSize) || pageSize,
         pages: Number(data.pages) || 50,
         total: Number(data.total) || 1000
       };
-
-      catalogPageCache.set(page, { data: result, timestamp: now });
-      return result;
     }
   } catch (e: any) {
     console.error('[Scraper] Failed to fetch catalog page', page, ':', e.message);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   BrowserRouter as Router,
   Routes,
@@ -526,6 +526,8 @@ function Dashboard() {
 
 function SearchPage() {
   const [query, setQuery] = useState('');
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
@@ -533,12 +535,43 @@ function SearchPage() {
   const [totalProducts, setTotalProducts] = useState(1000);
   const [trackedUrls, setTrackedUrls] = useState<Set<string>>(new Set());
   const [trackingUrl, setTrackingUrl] = useState<string | null>(null);
+  const searchWrapRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
-    fetchCatalog(1, query);
+    fetchCatalog(1, '');
     fetchTracked();
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchWrapRef.current && !searchWrapRef.current.contains(event.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Live typing autocomplete (Amazon/Flipkart style)
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (trimmed.length < 2) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await axios.get(`${API_URL}/api/products/suggest?q=${encodeURIComponent(trimmed)}`);
+        setSuggestions(res.data.suggestions || []);
+        setShowSuggestions(true);
+      } catch (err) {
+        console.error(err);
+      }
+    }, 200);
+
+    return () => clearTimeout(timer);
+  }, [query]);
 
   const fetchTracked = async () => {
     try {
@@ -563,7 +596,7 @@ function SearchPage() {
       setResults(res.data.results || []);
       if (res.data.page) setPage(res.data.page);
       if (res.data.pages) setTotalPages(res.data.pages);
-      if (res.data.total) setTotalProducts(res.data.total);
+      if (res.data.total !== undefined) setTotalProducts(res.data.total);
     } catch (e) {
       console.error(e);
     } finally {
@@ -571,10 +604,18 @@ function SearchPage() {
     }
   };
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSearch = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setShowSuggestions(false);
     setPage(1);
     fetchCatalog(1, query);
+  };
+
+  const selectSuggestion = (item: any) => {
+    setQuery(item.name);
+    setShowSuggestions(false);
+    setPage(1);
+    fetchCatalog(1, item.name);
   };
 
   const goToPage = (newPage: number) => {
@@ -633,20 +674,63 @@ function SearchPage() {
             INE Store Catalog
           </h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>
-            Showing {results.length} products on page {page} of {totalPages} ({totalProducts.toLocaleString()} total in store). Click "Track" to add price monitoring.
+            {query.trim()
+              ? `Found ${totalProducts} products matching "${query}". Page ${page} of ${totalPages}.`
+              : `Showing ${results.length} products on page ${page} of ${totalPages} (${totalProducts.toLocaleString()} total in store).`}
           </p>
         </div>
 
         <form onSubmit={handleSearch} className="search-box" style={{ marginBottom: '20px' }}>
-          <div className="search-input-wrap">
+          <div className="search-input-wrap" ref={searchWrapRef}>
             <Search size={14} />
             <input
               type="text"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search by name, category, or brand…"
+              onChange={(e) => {
+                setQuery(e.target.value);
+                if (!showSuggestions && e.target.value.trim().length >= 2) {
+                  setShowSuggestions(true);
+                }
+              }}
+              onFocus={() => {
+                if (suggestions.length > 0) setShowSuggestions(true);
+              }}
+              placeholder="Search 1,000 products by name, category, brand, or SKU…"
               className="search-input"
             />
+
+            {/* Live Flipkart / Amazon style suggestions dropdown */}
+            {showSuggestions && suggestions.length > 0 && (
+              <div className="search-suggestions-dropdown">
+                {suggestions.map((item) => (
+                  <div
+                    key={item.id}
+                    className="search-suggestion-item"
+                    onClick={() => selectSuggestion(item)}
+                  >
+                    <div className="suggestion-info">
+                      <div className="suggestion-name">{item.name}</div>
+                      <div className="suggestion-meta">
+                        {item.brand && <span>{item.brand}</span>}
+                        {item.category && <span className="tag lime">{item.category}</span>}
+                        <span className="suggestion-sku">{item.sku || `#${item.id}`}</span>
+                      </div>
+                    </div>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        color: 'var(--text-muted)',
+                        fontSize: '11px'
+                      }}
+                    >
+                      <Search size={11} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
           <button
             type="submit"

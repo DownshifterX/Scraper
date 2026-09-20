@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { supabase } from './db';
-import { scrapeProduct, fetchStoreProducts } from './scraper';
+import { scrapeProduct, fetchStoreProducts, searchAllProducts, getFullCatalog } from './scraper';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -64,38 +64,59 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Search products in the INE store catalog with pagination
+// Live autocomplete suggestions across all 1,000 products (Amazon / Flipkart style)
+app.get('/api/products/suggest', async (req, res) => {
+  const { q } = req.query;
+  if (!q || typeof q !== 'string' || !q.trim()) {
+    return res.json({ suggestions: [] });
+  }
+
+  try {
+    const catalog = await getFullCatalog();
+    const queryTerm = q.trim().toLowerCase();
+
+    // Match products by name, category, or brand
+    const matches: Array<{
+      id: number;
+      name: string;
+      category: string;
+      brand: string;
+      url: string;
+      sku: string;
+    }> = [];
+
+    for (const item of catalog) {
+      if (
+        item.name.toLowerCase().includes(queryTerm) ||
+        (item.category && item.category.toLowerCase().includes(queryTerm)) ||
+        (item.brand && item.brand.toLowerCase().includes(queryTerm))
+      ) {
+        matches.push(item);
+        if (matches.length >= 8) break; // Limit suggestions to top 8
+      }
+    }
+
+    res.json({ suggestions: matches });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Search across ALL 1,000 products in the store with pagination
 app.get('/api/products/search', async (req, res) => {
   const { q, page = '1', pageSize = '20' } = req.query;
   const pageNum = Math.max(1, parseInt(page as string, 10) || 1);
   const limit = Math.min(100, Math.max(1, parseInt(pageSize as string, 10) || 20));
 
   try {
-    const catalogData = await fetchStoreProducts(pageNum, limit);
-
-    if (!q || typeof q !== 'string' || !q.trim()) {
-      return res.json({
-        results: catalogData.items,
-        page: catalogData.page,
-        pages: catalogData.pages,
-        total: catalogData.total
-      });
-    }
-
-    // Filter within current page items or search query
-    const queryTerm = q.trim().toLowerCase();
-    const filtered = catalogData.items.filter((item) =>
-      item.name.toLowerCase().includes(queryTerm) ||
-      item.category.toLowerCase().includes(queryTerm) ||
-      item.brand.toLowerCase().includes(queryTerm) ||
-      item.sku.toLowerCase().includes(queryTerm)
-    );
+    const queryTerm = typeof q === 'string' ? q : '';
+    const data = await searchAllProducts(queryTerm, pageNum, limit);
 
     res.json({
-      results: filtered,
-      page: catalogData.page,
-      pages: catalogData.pages,
-      total: catalogData.total
+      results: data.results,
+      page: data.page,
+      pages: data.pages,
+      total: data.total
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
