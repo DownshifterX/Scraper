@@ -358,109 +358,110 @@ app.post('/api/cron/scrape', async (req, res) => {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  try {
-    let products: Array<{ id: string; product_url: string }> = [];
+  // Respond immediately so cron-job.org or external caller never times out
+  res.json({ message: 'Scrape job triggered successfully and running in background' });
 
-    if (isSupabaseConfigured()) {
-      const { data, error } = await supabase
-        .from('tracked_products')
-        .select('*')
-        .eq('active', true);
-      if (error) throw error;
-      products = data || [];
-    } else {
-      products = Array.from(memoryDB.products.values()).filter((p) => p.active);
-    }
-
-    let successful = 0;
-    let failed = 0;
-
-    for (const product of products) {
-      const result = await scrapeProduct(product.product_url);
-      const logStatus = result.success ? (result.attempt > 1 ? 'RETRIED' : 'SUCCESS') : 'FAILED';
-      const nowIso = new Date().toISOString();
+  // Execute scrape loop asynchronously in background
+  (async () => {
+    try {
+      let products: Array<{ id: string; product_url: string }> = [];
 
       if (isSupabaseConfigured()) {
-        await supabase.from('scrape_logs').insert({
-          product_id: product.id,
-          started_at: new Date(Date.now() - result.duration_ms).toISOString(),
-          finished_at: nowIso,
-          status: logStatus,
-          attempt: result.attempt,
-          price: result.price,
-          stock: result.stock,
-          error_message: result.error,
-          duration_ms: result.duration_ms
-        });
-
-        if (result.success && result.price) {
-          await supabase.from('price_history').insert({
-            product_id: product.id,
-            price: result.price,
-            stock: result.stock
-          });
-
-          await supabase
-            .from('tracked_products')
-            .update({
-              latest_price: result.price,
-              latest_stock: result.stock,
-              updated_at: nowIso
-            })
-            .eq('id', product.id);
-
-          successful++;
-        } else {
-          failed++;
-        }
+        const { data, error } = await supabase
+          .from('tracked_products')
+          .select('*')
+          .eq('active', true);
+        if (error) throw error;
+        products = data || [];
       } else {
-        memoryDB.logs.push({
-          id: `log-${Date.now()}`,
-          product_id: product.id,
-          started_at: new Date(Date.now() - result.duration_ms).toISOString(),
-          finished_at: nowIso,
-          status: logStatus,
-          attempt: result.attempt,
-          price: result.price,
-          stock: result.stock,
-          error_message: result.error,
-          duration_ms: result.duration_ms,
-          created_at: nowIso
-        });
-
-        if (result.success && result.price) {
-          memoryDB.history.push({
-            id: `hist-${Date.now()}`,
-            product_id: product.id,
-            price: result.price,
-            stock: result.stock,
-            scraped_at: nowIso
-          });
-
-          const p = memoryDB.products.get(product.id);
-          if (p) {
-            p.latest_price = result.price;
-            p.latest_stock = result.stock;
-            p.updated_at = nowIso;
-          }
-          successful++;
-        } else {
-          failed++;
-        }
+        products = Array.from(memoryDB.products.values()).filter((p) => p.active);
       }
 
-      // 2-second rate-limiting space between products to avoid upstream 429
-      await new Promise((r) => setTimeout(r, 2000));
-    }
+      let successful = 0;
+      let failed = 0;
 
-    res.json({
-      productsProcessed: products.length,
-      successful,
-      failed
-    });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
+      for (const product of products) {
+        const result = await scrapeProduct(product.product_url);
+        const logStatus = result.success ? (result.attempt > 1 ? 'RETRIED' : 'SUCCESS') : 'FAILED';
+        const nowIso = new Date().toISOString();
+
+        if (isSupabaseConfigured()) {
+          await supabase.from('scrape_logs').insert({
+            product_id: product.id,
+            started_at: new Date(Date.now() - result.duration_ms).toISOString(),
+            finished_at: nowIso,
+            status: logStatus,
+            attempt: result.attempt,
+            price: result.price,
+            stock: result.stock,
+            error_message: result.error,
+            duration_ms: result.duration_ms
+          });
+
+          if (result.success && result.price) {
+            await supabase.from('price_history').insert({
+              product_id: product.id,
+              price: result.price,
+              stock: result.stock
+            });
+
+            await supabase
+              .from('tracked_products')
+              .update({
+                latest_price: result.price,
+                latest_stock: result.stock,
+                updated_at: nowIso
+              })
+              .eq('id', product.id);
+
+            successful++;
+          } else {
+            failed++;
+          }
+        } else {
+          memoryDB.logs.push({
+            id: `log-${Date.now()}`,
+            product_id: product.id,
+            started_at: new Date(Date.now() - result.duration_ms).toISOString(),
+            finished_at: nowIso,
+            status: logStatus,
+            attempt: result.attempt,
+            price: result.price,
+            stock: result.stock,
+            error_message: result.error,
+            duration_ms: result.duration_ms,
+            created_at: nowIso
+          });
+
+          if (result.success && result.price) {
+            memoryDB.history.push({
+              id: `hist-${Date.now()}`,
+              product_id: product.id,
+              price: result.price,
+              stock: result.stock,
+              scraped_at: nowIso
+            });
+
+            const p = memoryDB.products.get(product.id);
+            if (p) {
+              p.latest_price = result.price;
+              p.latest_stock = result.stock;
+              p.updated_at = nowIso;
+            }
+            successful++;
+          } else {
+            failed++;
+          }
+        }
+
+        // 2-second rate-limiting space between products to avoid upstream 429
+        await new Promise((r) => setTimeout(r, 2000));
+      }
+      console.log(`[CRON SCRAPE] Completed. Processed: ${products.length}, Success: ${successful}, Failed: ${failed}`);
+    } catch (err: any) {
+      console.error('[CRON SCRAPE ERROR]', err.message);
+    }
+  })();
 });
 
 app.listen(port, () => {
