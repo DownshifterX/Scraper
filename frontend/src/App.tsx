@@ -30,7 +30,6 @@ import {
   Minus,
   ChevronLeft,
   ChevronRight,
-  GitBranch,
   ShieldCheck,
   Database,
   Info,
