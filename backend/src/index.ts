@@ -64,21 +64,39 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Search products in the INE store catalog
+// Search products in the INE store catalog with pagination
 app.get('/api/products/search', async (req, res) => {
-  const { q } = req.query;
+  const { q, page = '1', pageSize = '20' } = req.query;
+  const pageNum = Math.max(1, parseInt(page as string, 10) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(pageSize as string, 10) || 20));
+
   try {
-    const catalog = await fetchStoreProducts();
-    if (!q || typeof q !== 'string') {
-      return res.json({ results: catalog.slice(0, 20) });
+    const catalogData = await fetchStoreProducts(pageNum, limit);
+
+    if (!q || typeof q !== 'string' || !q.trim()) {
+      return res.json({
+        results: catalogData.items,
+        page: catalogData.page,
+        pages: catalogData.pages,
+        total: catalogData.total
+      });
     }
-    const filtered = catalog.filter((item) =>
-      item.name.toLowerCase().includes(q.toLowerCase()) ||
-      item.category.toLowerCase().includes(q.toLowerCase()) ||
-      item.brand.toLowerCase().includes(q.toLowerCase()) ||
-      item.sku.toLowerCase().includes(q.toLowerCase())
+
+    // Filter within current page items or search query
+    const queryTerm = q.trim().toLowerCase();
+    const filtered = catalogData.items.filter((item) =>
+      item.name.toLowerCase().includes(queryTerm) ||
+      item.category.toLowerCase().includes(queryTerm) ||
+      item.brand.toLowerCase().includes(queryTerm) ||
+      item.sku.toLowerCase().includes(queryTerm)
     );
-    res.json({ results: filtered });
+
+    res.json({
+      results: filtered,
+      page: catalogData.page,
+      pages: catalogData.pages,
+      total: catalogData.total
+    });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

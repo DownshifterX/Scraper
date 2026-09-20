@@ -27,7 +27,9 @@ import {
   BarChart2,
   Target,
   Plus,
-  Minus
+  Minus,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import {
   AreaChart,
@@ -526,12 +528,15 @@ function SearchPage() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(50);
+  const [totalProducts, setTotalProducts] = useState(1000);
   const [trackedUrls, setTrackedUrls] = useState<Set<string>>(new Set());
   const [trackingUrl, setTrackingUrl] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
-    fetchCatalog();
+    fetchCatalog(1, query);
     fetchTracked();
   }, []);
 
@@ -544,14 +549,21 @@ function SearchPage() {
     } catch (e) {}
   };
 
-  const fetchCatalog = async (q = '') => {
+  const fetchCatalog = async (targetPage = page, q = query) => {
     setLoading(true);
     try {
-      const url = q
-        ? `${API_URL}/api/products/search?q=${encodeURIComponent(q)}`
-        : `${API_URL}/api/products/search`;
-      const res = await axios.get(url);
+      const params = new URLSearchParams({
+        page: String(targetPage),
+        pageSize: '20'
+      });
+      if (q && q.trim()) {
+        params.append('q', q.trim());
+      }
+      const res = await axios.get(`${API_URL}/api/products/search?${params.toString()}`);
       setResults(res.data.results || []);
+      if (res.data.page) setPage(res.data.page);
+      if (res.data.pages) setTotalPages(res.data.pages);
+      if (res.data.total) setTotalProducts(res.data.total);
     } catch (e) {
       console.error(e);
     } finally {
@@ -561,7 +573,15 @@ function SearchPage() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    fetchCatalog(query);
+    setPage(1);
+    fetchCatalog(1, query);
+  };
+
+  const goToPage = (newPage: number) => {
+    if (newPage < 1 || newPage > totalPages || newPage === page || loading) return;
+    setPage(newPage);
+    fetchCatalog(newPage, query);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const trackProduct = async (url: string, name: string) => {
@@ -613,7 +633,7 @@ function SearchPage() {
             INE Store Catalog
           </h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>
-            Browse {results.length} products. Click "Track" to add price monitoring.
+            Showing {results.length} products on page {page} of {totalPages} ({totalProducts.toLocaleString()} total in store). Click "Track" to add price monitoring.
           </p>
         </div>
 
@@ -650,97 +670,193 @@ function SearchPage() {
               gap: '12px'
             }}
           >
-            {[1, 2, 3, 4, 5, 6].map((n) => (
+            {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
               <div
                 key={n}
                 className="skeleton"
-                style={{ height: '100px', borderRadius: '6px' }}
+                style={{ height: '110px', borderRadius: '6px' }}
               />
             ))}
           </div>
         ) : (
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-              gap: '12px'
-            }}
-          >
-            {results.map((r, i) => {
-              const isTracked = trackedUrls.has(r.url);
-              const isProcessing = trackingUrl === r.url;
-              return (
-                <div key={i} className="catalog-card">
-                  <div className="catalog-card-icon">
-                    <Package size={16} />
-                  </div>
-                  <div className="catalog-card-body">
-                    <div className="catalog-card-sku">{r.sku || `#${r.id}`}</div>
-                    <div className="catalog-card-name">{r.name}</div>
-                    <div className="catalog-card-meta">
-                      {r.category && (
-                        <span className="tag lime">{r.category}</span>
-                      )}
-                      {r.brand && <span className="tag">{r.brand}</span>}
+          <>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                gap: '12px'
+              }}
+            >
+              {results.map((r, i) => {
+                const isTracked = trackedUrls.has(r.url);
+                const isProcessing = trackingUrl === r.url;
+                return (
+                  <div key={i} className="catalog-card">
+                    <div className="catalog-card-icon">
+                      <Package size={16} />
                     </div>
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        marginTop: '10px'
-                      }}
-                    >
-                      <a
-                        href={r.url}
-                        target="_blank"
-                        rel="noreferrer"
+                    <div className="catalog-card-body">
+                      <div className="catalog-card-sku">{r.sku || `#${r.id}`}</div>
+                      <div className="catalog-card-name">{r.name}</div>
+                      <div className="catalog-card-meta">
+                        {r.category && (
+                          <span className="tag lime">{r.category}</span>
+                        )}
+                        {r.brand && <span className="tag">{r.brand}</span>}
+                      </div>
+                      <div
                         style={{
-                          fontSize: '11px',
-                          color: 'var(--text-muted)',
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '3px',
-                          textDecoration: 'none'
+                          justifyContent: 'space-between',
+                          marginTop: '10px'
                         }}
                       >
-                        View <ExternalLink size={10} />
-                      </a>
-                      <button
-                        onClick={() =>
-                          !isTracked && !isProcessing && trackProduct(r.url, r.name)
-                        }
-                        disabled={isTracked || isProcessing}
-                        className={`btn btn-sm ${
-                          isTracked ? 'btn-default' : 'btn-primary'
-                        }`}
-                      >
-                        {isProcessing ? (
-                          <>
-                            <RefreshCw
-                              size={11}
-                              style={{ animation: 'spin 1s linear infinite' }}
-                            />
-                            Adding…
-                          </>
-                        ) : isTracked ? (
-                          <>
-                            <CheckCircle2 size={11} />
-                            Tracking
-                          </>
-                        ) : (
-                          <>
-                            <Plus size={11} />
-                            Track
-                          </>
-                        )}
-                      </button>
+                        <a
+                          href={r.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{
+                            fontSize: '11px',
+                            color: 'var(--text-muted)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '3px',
+                            textDecoration: 'none'
+                          }}
+                        >
+                          View <ExternalLink size={10} />
+                        </a>
+                        <button
+                          onClick={() =>
+                            !isTracked && !isProcessing && trackProduct(r.url, r.name)
+                          }
+                          disabled={isTracked || isProcessing}
+                          className={`btn btn-sm ${
+                            isTracked ? 'btn-default' : 'btn-primary'
+                          }`}
+                        >
+                          {isProcessing ? (
+                            <>
+                              <RefreshCw
+                                size={11}
+                                style={{ animation: 'spin 1s linear infinite' }}
+                              />
+                              Adding…
+                            </>
+                          ) : isTracked ? (
+                            <>
+                              <CheckCircle2 size={11} />
+                              Tracking
+                            </>
+                          ) : (
+                            <>
+                              <Plus size={11} />
+                              Track
+                            </>
+                          )}
+                        </button>
+                      </div>
                     </div>
                   </div>
+                );
+              })}
+            </div>
+
+            {/* Pagination controls */}
+            {totalPages > 1 && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  marginTop: '28px',
+                  padding: '16px 0',
+                  borderTop: '1px solid var(--border)'
+                }}
+              >
+                <button
+                  onClick={() => goToPage(page - 1)}
+                  disabled={page <= 1 || loading}
+                  className="btn btn-default btn-sm"
+                  style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+                >
+                  <ChevronLeft size={13} />
+                  Prev
+                </button>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  {page > 2 && (
+                    <>
+                      <button
+                        onClick={() => goToPage(1)}
+                        className="btn btn-default btn-sm"
+                        style={{ minWidth: '32px' }}
+                      >
+                        1
+                      </button>
+                      {page > 3 && (
+                        <span style={{ color: 'var(--text-muted)', padding: '0 4px' }}>…</span>
+                      )}
+                    </>
+                  )}
+
+                  {page > 1 && (
+                    <button
+                      onClick={() => goToPage(page - 1)}
+                      className="btn btn-default btn-sm"
+                      style={{ minWidth: '32px' }}
+                    >
+                      {page - 1}
+                    </button>
+                  )}
+
+                  <button
+                    className="btn btn-primary btn-sm"
+                    style={{ minWidth: '32px', fontWeight: 600 }}
+                  >
+                    {page}
+                  </button>
+
+                  {page < totalPages && (
+                    <button
+                      onClick={() => goToPage(page + 1)}
+                      className="btn btn-default btn-sm"
+                      style={{ minWidth: '32px' }}
+                    >
+                      {page + 1}
+                    </button>
+                  )}
+
+                  {page < totalPages - 1 && (
+                    <>
+                      {page < totalPages - 2 && (
+                        <span style={{ color: 'var(--text-muted)', padding: '0 4px' }}>…</span>
+                      )}
+                      <button
+                        onClick={() => goToPage(totalPages)}
+                        className="btn btn-default btn-sm"
+                        style={{ minWidth: '32px' }}
+                      >
+                        {totalPages}
+                      </button>
+                    </>
+                  )}
                 </div>
-              );
-            })}
-          </div>
+
+                <button
+                  onClick={() => goToPage(page + 1)}
+                  disabled={page >= totalPages || loading}
+                  className="btn btn-default btn-sm"
+                  style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+                >
+                  Next
+                  <ChevronRight size={13} />
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
 

@@ -267,22 +267,39 @@ export async function scrapeProduct(
   };
 }
 
-/**
- * Fetch catalog products from the mock store API or fallback.
- */
-let cachedCatalog: Array<{ id: number; name: string; url: string; sku: string; category: string; brand: string }> = [];
-let catalogCacheTime = 0;
+export interface CatalogItem {
+  id: number;
+  name: string;
+  url: string;
+  sku: string;
+  category: string;
+  brand: string;
+}
 
-export async function fetchStoreProducts(): Promise<
-  Array<{ id: number; name: string; url: string; sku: string; category: string; brand: string }>
-> {
+export interface CatalogResponse {
+  items: CatalogItem[];
+  page: number;
+  pageSize: number;
+  pages: number;
+  total: number;
+}
+
+const catalogPageCache = new Map<number, { data: CatalogResponse; timestamp: number }>();
+
+export async function fetchStoreProducts(page = 1, pageSize = 20): Promise<CatalogResponse> {
+  const cached = catalogPageCache.get(page);
   const now = Date.now();
-  if (cachedCatalog.length > 0 && now - catalogCacheTime < 10 * 60 * 1000) {
-    return cachedCatalog;
+  if (cached && now - cached.timestamp < 5 * 60 * 1000) {
+    return cached.data;
   }
 
   try {
-    const res = await fetch('https://demo.inelabteamdev.com/api/catalog');
+    const res = await fetch(`https://demo.inelabteamdev.com/api/catalog?page=${page}&pageSize=${pageSize}`, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      }
+    });
+
     if (res.ok) {
       const data: any = await res.json();
       const items = (data.items || []).map((item: any) => ({
@@ -293,13 +310,27 @@ export async function fetchStoreProducts(): Promise<
         category: item.category,
         brand: item.brand
       }));
-      cachedCatalog = items;
-      catalogCacheTime = now;
-      return items;
+
+      const result: CatalogResponse = {
+        items,
+        page: Number(data.page) || page,
+        pageSize: Number(data.pageSize) || pageSize,
+        pages: Number(data.pages) || 50,
+        total: Number(data.total) || 1000
+      };
+
+      catalogPageCache.set(page, { data: result, timestamp: now });
+      return result;
     }
   } catch (e: any) {
-    console.error('[Scraper] Failed to fetch catalog:', e.message);
+    console.error('[Scraper] Failed to fetch catalog page', page, ':', e.message);
   }
 
-  return cachedCatalog;
+  return {
+    items: [],
+    page,
+    pageSize,
+    pages: 50,
+    total: 1000
+  };
 }
