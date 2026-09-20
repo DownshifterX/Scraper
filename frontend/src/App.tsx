@@ -47,7 +47,7 @@ import {
 } from 'recharts';
 import './index.css';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? 'https://scraper-zxhp.onrender.com' : 'http://localhost:3000');
 
 function GithubIcon({ size = 16 }: { size?: number }) {
   return (
