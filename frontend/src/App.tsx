@@ -30,6 +30,7 @@ import {
   Minus,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   ShieldCheck,
   Database,
   Info,
@@ -316,6 +317,8 @@ function Dashboard() {
   const [recentLogs, setRecentLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [scrapingId, setScrapingId] = useState<string | null>(null);
+  const [showActivity, setShowActivity] = useState(false);
+  const [scrapingAll, setScrapingAll] = useState(false);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -393,6 +396,29 @@ function Dashboard() {
           <span>Dashboard</span>
         </div>
         <div className="topbar-actions">
+          <button
+            onClick={async () => {
+              if (tracked.length === 0) return;
+              setScrapingAll(true);
+              try {
+                await axios.post(`${API_URL}/api/products/scrape-all`);
+              } catch (e) {
+                console.error(e);
+              }
+              // Give the backend a moment to start, then refresh
+              setTimeout(() => {
+                fetchAll();
+                setScrapingAll(false);
+              }, 3000);
+            }}
+            disabled={scrapingAll || tracked.length === 0}
+            className="btn btn-default btn-sm"
+            title="Force scrape all tracked products"
+            style={{ gap: '4px' }}
+          >
+            <Zap size={13} className={scrapingAll ? 'spin' : ''} style={scrapingAll ? { animation: 'spin 1s linear infinite' } : {}} />
+            {scrapingAll ? 'Scraping...' : 'Scrape All'}
+          </button>
           <button
             onClick={fetchAll}
             className="btn btn-default btn-sm"
@@ -620,53 +646,71 @@ function Dashboard() {
           {/* RIGHT: Activity Feed */}
           <div className="dashboard-side">
             <div className="panel">
-              <div className="panel-header">
+              <div
+                className="panel-header"
+                onClick={() => setShowActivity((v) => !v)}
+                style={{ cursor: 'pointer', userSelect: 'none' }}
+                title={showActivity ? 'Click to collapse' : 'Click to expand'}
+              >
                 <div className="panel-title">
                   <Activity size={14} />
                   Recent Activity
+                  <span className="sidebar-badge" style={{ marginLeft: 4 }}>
+                    {recentLogs.length} runs
+                  </span>
                 </div>
-              </div>
-              {recentLogs.length === 0 ? (
-                <div
+                <ChevronDown
+                  size={14}
                   style={{
-                    padding: '24px 16px',
-                    textAlign: 'center',
-                    color: 'var(--text-muted)',
-                    fontSize: '13px'
+                    transition: 'transform 0.2s ease',
+                    transform: showActivity ? 'rotate(180deg)' : 'rotate(0deg)',
+                    color: 'var(--text-muted)'
                   }}
-                >
-                  No scrape activity yet.<br />
-                  Click "Refresh" or trigger a scrape.
-                </div>
-              ) : (
-                recentLogs.map((log) => (
-                  <div key={log.id} className="activity-item">
-                    <span
-                      className={`activity-dot ${log.status.toLowerCase()}`}
-                    />
-                    <div className="activity-body">
-                      <div className="activity-title">
-                        {log.status === 'SUCCESS' ? (
-                          <>
-                            Scraped{' '}
-                            <strong style={{ color: 'var(--yellow)' }}>
-                              ₹{Number(log.price).toLocaleString('en-IN')}
-                            </strong>
-                          </>
-                        ) : (
-                          <>Run {log.status.toLowerCase()}</>
-                        )}
-                      </div>
-                      <div className="activity-meta">
-                        {log.product_name} · {timeAgo(log.started_at)} ·{' '}
-                        {log.duration_ms
-                          ? `${(log.duration_ms / 1000).toFixed(1)}s`
-                          : ''}
-                      </div>
-                    </div>
-                    <StatusBadge status={log.status} />
+                />
+              </div>
+              {showActivity && (
+                recentLogs.length === 0 ? (
+                  <div
+                    style={{
+                      padding: '24px 16px',
+                      textAlign: 'center',
+                      color: 'var(--text-muted)',
+                      fontSize: '13px'
+                    }}
+                  >
+                    No scrape activity yet.<br />
+                    Click "Refresh" or trigger a scrape.
                   </div>
-                ))
+                ) : (
+                  recentLogs.map((log) => (
+                    <div key={log.id} className="activity-item">
+                      <span
+                        className={`activity-dot ${log.status.toLowerCase()}`}
+                      />
+                      <div className="activity-body">
+                        <div className="activity-title">
+                          {log.status === 'SUCCESS' ? (
+                            <>
+                              Scraped{' '}
+                              <strong style={{ color: 'var(--yellow)' }}>
+                                ₹{Number(log.price).toLocaleString('en-IN')}
+                              </strong>
+                            </>
+                          ) : (
+                            <>Run {log.status.toLowerCase()}</>
+                          )}
+                        </div>
+                        <div className="activity-meta">
+                          {log.product_name} · {timeAgo(log.started_at)} ·{' '}
+                          {log.duration_ms
+                            ? `${(log.duration_ms / 1000).toFixed(1)}s`
+                            : ''}
+                        </div>
+                      </div>
+                      <StatusBadge status={log.status} />
+                    </div>
+                  ))
+                )
               )}
             </div>
 

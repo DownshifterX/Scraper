@@ -349,6 +349,113 @@ app.get('/api/products/:id/logs', async (req, res) => {
   }
 });
 
+// Force-scrape ALL tracked products (manual trigger from dashboard)
+app.post('/api/products/scrape-all', async (req, res) => {
+  // Respond immediately so the UI doesn't hang
+  res.json({ message: 'Scraping all tracked products in background' });
+
+  (async () => {
+    try {
+      let products: Array<{ id: string; product_url: string }> = [];
+
+      if (isSupabaseConfigured()) {
+        const { data, error } = await supabase
+          .from('tracked_products')
+          .select('*')
+          .eq('active', true);
+        if (error) throw error;
+        products = data || [];
+      } else {
+        products = Array.from(memoryDB.products.values()).filter((p) => p.active);
+      }
+
+      console.log(`[SCRAPE-ALL] Starting scrape of ${products.length} products...`);
+      let successful = 0;
+      let failed = 0;
+
+      for (const product of products) {
+        const result = await scrapeProduct(product.product_url);
+        const logStatus = result.success ? (result.attempt > 1 ? 'RETRIED' : 'SUCCESS') : 'FAILED';
+        const nowIso = new Date().toISOString();
+
+        if (isSupabaseConfigured()) {
+          await supabase.from('scrape_logs').insert({
+            product_id: product.id,
+            started_at: new Date(Date.now() - result.duration_ms).toISOString(),
+            finished_at: nowIso,
+            status: logStatus,
+            attempt: result.attempt,
+            price: result.price,
+            stock: result.stock,
+            error_message: result.error,
+            duration_ms: result.duration_ms
+          });
+
+          if (result.success && result.price) {
+            await supabase.from('price_history').insert({
+              product_id: product.id,
+              price: result.price,
+              stock: result.stock
+            });
+
+            await supabase
+              .from('tracked_products')
+              .update({
+                latest_price: result.price,
+                latest_stock: result.stock,
+                updated_at: nowIso
+              })
+              .eq('id', product.id);
+
+            successful++;
+          } else {
+            failed++;
+          }
+        } else {
+          memoryDB.logs.push({
+            id: `log-${Date.now()}`,
+            product_id: product.id,
+            started_at: new Date(Date.now() - result.duration_ms).toISOString(),
+            finished_at: nowIso,
+            status: logStatus,
+            attempt: result.attempt,
+            price: result.price,
+            stock: result.stock,
+            error_message: result.error,
+            duration_ms: result.duration_ms,
+            created_at: nowIso
+          });
+
+          if (result.success && result.price) {
+            memoryDB.history.push({
+              id: `hist-${Date.now()}`,
+              product_id: product.id,
+              price: result.price,
+              stock: result.stock,
+              scraped_at: nowIso
+            });
+
+            const p = memoryDB.products.get(product.id);
+            if (p) {
+              p.latest_price = result.price;
+              p.latest_stock = result.stock;
+              p.updated_at = nowIso;
+            }
+            successful++;
+          } else {
+            failed++;
+          }
+        }
+
+        await new Promise((r) => setTimeout(r, 2000));
+      }
+      console.log(`[SCRAPE-ALL] Completed. Processed: ${products.length}, Success: ${successful}, Failed: ${failed}`);
+    } catch (err: any) {
+      console.error('[SCRAPE-ALL ERROR]', err.message);
+    }
+  })();
+});
+
 // Cron / Automated scrape endpoint
 app.post('/api/cron/scrape', async (req, res) => {
   const authHeader = req.headers.authorization;
